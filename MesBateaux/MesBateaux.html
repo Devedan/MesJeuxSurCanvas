@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Animation avec GameFrame</title>
+    <style>
+        body {
+            background-color: #eee;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        main {
+            position: relative;
+            background-color: #fff;
+            width: 420px;
+            height: 420px;
+            top: 160px;
+            border: 2px solid white;
+            border-radius: 20px;
+            padding: 10px;
+            box-shadow: 0px 0px 10px #aaa;
+            align-self: center;
+        }
+
+        #backgroundCanvas {
+            position: absolute;
+            padding: 10px;
+            left: 10px;
+            top: 10px;
+            z-index: 0;
+            border: 2px solid white;
+            border-radius: 20px;
+            align-self: center;
+        }
+
+        #myCanvas {
+            position: absolute;
+            padding: 10px;
+            left: 10px;
+            top: 10px;
+            z-index: 1;
+            align-self: center;
+        }
+
+    </style>
+</head>
+
+<body>
+    <main>
+        <div id="resultat"></div>
+        <canvas id="backgroundCanvas" height="400" width="400"></canvas>
+        <canvas id="myCanvas" width="400" height="400"></canvas>
+    </main>
+    <script>
+        var window = this.window,
+            document = this.document;
+
+        var GF = function() {
+            "use strict";
+
+            var myCanvas, backgroundCanvas, ctx, ctx2, fpsContainer,
+                canvasWidth, canvasHeight,
+                img,
+                imgW = 'paper_boat_TWest.png',
+                imgE = 'paper_boat_TEast.png',
+                largeurMax = 50,
+                hauteurMax = 50,
+                numberOfBateaux = 3,
+                facteurVitesse = 0.7, //en variant ce facteur, on varie la vitesse globale des bateaux.
+                bateauArray = [],
+                frameCount = 0, // vars for counting frames/s, used by the measureFPS function
+                lastTime,
+                fps,
+                measureFPS = function(newTime) { //measureFPS is a var
+
+                    // test for the very first invocation
+                    if (lastTime === undefined) {
+                        lastTime = newTime;
+                        return;
+                    }
+
+                    //calculate the difference between last & current frame
+                    var diffTime = newTime - lastTime;
+
+                    if (diffTime >= 1000) {
+                        fps = frameCount;
+                        frameCount = 0;
+                        lastTime = newTime;
+                    }
+
+                    //and display it in an element we appended to the 
+                    // document in the start() function
+                    fpsContainer.innerHTML = 'FPS: ' + fps;
+                    frameCount += 1;
+                };
+
+            // constructor function
+            function Bateau(x, y, angle, v, diameter, image) {
+                this.x = x;
+                this.y = y;
+                this.angle = 15;
+                this.v = v;
+                this.radius = diameter / 2;
+                this.image = image;
+
+                this.draw = function() {
+                    img.src = this.image;
+                    ctx.drawImage(img, this.x, this.y, largeurMax, hauteurMax);
+                    ctx.fill();
+                };
+
+                this.move = function() {
+                    // add horizontal increment to the x pos
+                    // add vertical increment to the y pos
+                    this.x += this.v * Math.cos(this.angle) * facteurVitesse;
+                    this.y += this.v * Math.sin(this.angle) * facteurVitesse;
+                    //alert(this.y);
+                    /*if (((this.x - x) > 2)) {
+                        this.x -= 1;
+                    }*/
+
+
+                    /*//forcer une navigation plus horizontale - a revoir
+                    if (this.y >= y + 16 * Math.random()) {
+                        this.y -= 8 * Math.random();
+                    }*/
+
+                    /*if (y + dy > 130 || y + dy < 0) {
+                        //dx *= 0.99;  //ralentit sur l'axe des x. Bon pour le bounce mais pas pour la navigation..  Garder pour simuler le vent de face.
+                        dy = -dy; //monte et descend les vagues.
+                    }*/
+                    /*if (Math.abs(dx) < 0.01) {
+                        dx = 0;
+                    }  va avec le calcul du bounce. i.e. de la perte d'energie' 
+                    garder pour arreter le bateau.
+                    */
+                    /*    dy++; //alert("dy " + dy);*/
+
+                };
+            }
+
+            function testCollisionWithWalls(bateau) {
+                var collided = false;
+
+                if (bateau.x < -bateau.radius) { // left
+                    bateau.image = imgW;
+                    bateau.x = bateau.radius;
+                    bateau.angle = -bateau.angle + Math.PI;
+                    //Hummm bizarre d'ajouter pi.
+                    collided = true;
+                } else if (bateau.x > canvasWidth - (bateau.radius)) { // right
+                    bateau.image = imgE;
+                    bateau.x = canvasWidth - (bateau.radius);
+                    bateau.angle = -bateau.angle + Math.PI;
+                    collided = true;
+                }
+
+                if (bateau.y < -bateau.radius) { // up
+                    bateau.y = bateau.radius;
+                    bateau.angle = -bateau.angle;
+                    collided = true;
+                } else if (bateau.y > canvasHeight - (bateau.radius)) { // down
+                    bateau.y = canvasHeight - (bateau.radius);
+                    bateau.angle = -bateau.angle;
+                    collided = true;
+                }
+
+                if (collided) {
+                    bruitCollision.play();
+                }
+            }
+
+            //VERIFIER COLLISION ENTRE BATEAUX
+            //Si les valeurs des x et les valeurs des y des 2 bateaux sont plus proches que la somme des 2 rayons, alors les bateaux collisionnent.
+            /* function testCollisionWithBoats(bateau) {
+                 "use strict";
+                 var i = 0,
+                     indexCollisions = [],
+                     collision = "",
+                     leBateau;
+
+                 for (i = 0; i < bateauArray.length; i++) {
+                     leBateau = bateauArray[i];
+                     if (((bateau.x + leBateau.x) < (bateau.radius + leBateau.radius)) && ((bateau.y + leBateau.y) < (bateau.radius + leBateau.radius))) {
+                         indexCollisions += i;
+                         bruitCollision.play();
+                     } else {
+                         alert("No");
+                     }
+
+                 }
+
+             }*/
+
+            var mainLoop = function() {
+                //main function, called each frame 
+                var aBateau,
+                    i;
+
+                //measureFPS(+(new Date()));
+
+                // call the animation loop every 1/60th of second
+                // call with an error in the code
+                //var img = new Image();
+                //img.onerror = mainLoop; //pourquoi on error... biz va creer une loop?
+                //img.src = 'data:image/png,' + Math.random();
+
+                // clear the canvas
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+                // for each bateau in the array
+                for (i = 0; i < bateauArray.length; i += 1) {
+                    aBateau = bateauArray[i];
+
+                    // 1) move the bateau
+                    aBateau.move();
+
+                    // 2) test if the bateau collides with a wall
+                    testCollisionWithWalls(aBateau);
+
+                    //testCollisionWithBoats(aBateau);
+
+                    //3) draw the bateau
+                    aBateau.draw();
+                }
+
+                //Il faut refaire ce request a chaque loop
+                window.requestAnimationFrame(mainLoop);
+            };
+
+            function createBateaux(numberOfBateaux) {
+                var bateau;
+                for (var i = 0; i < numberOfBateaux; i++) {
+                    // Create a bateau with random position and speed. 
+                    // You can change the radius
+                    //x, y, angle, vitesse, diameter, image
+                    bateau = new Bateau(canvasWidth * Math.random(),
+                        canvasHeight * Math.random(),
+                        (2 * Math.PI) * Math.random(),
+                        (10 * Math.random()) - 5,
+                        30, "paper_boat_TWest.png");
+                    //alert("vitesse du bateau " + bateau.v);
+                    // We add it to the array
+                    bateauArray.push(bateau);
+                }
+                //alert("bateaux created " + bateauArray.length);
+            }
+
+            function init() {
+                myCanvas = document.querySelector("#myCanvas");
+                backgroundCanvas = document.querySelector("#backgroundCanvas");
+                //document.getElementById('resultat').innerHTML += backgroundCanvas.compareDocumentPosition(myCanvas);
+                ctx = myCanvas.getContext('2d');
+                ctx2 = backgroundCanvas.getContext('2d');
+                canvasWidth = myCanvas.width;
+                canvasHeight = myCanvas.height;
+                img = new Image(canvasWidth, canvasHeight); //for the boats
+                var myBackground = new Image(canvasWidth, canvasHeight);
+                myBackground.src = "water.png";
+                myBackground.onload = function() {
+                    ctx2.drawImage(myBackground, 0, 0);
+                    //ctx2.drawImage("water.png", 0, 0);
+
+                }
+                //creer les bateaux
+                createBateaux(numberOfBateaux);
+            }
+
+            var start = function() {
+                // adds a div for displaying the fps value
+                fpsContainer = document.createElement('div');
+                document.body.appendChild(fpsContainer);
+                init();
+                window.requestAnimationFrame(mainLoop);
+            };
+
+            //our GameFramework returns a public API visible from outside its scope
+            return {
+                start: start
+            };
+        };
+
+
+        window.onload = function jouer() {
+            "use strict";
+            var game = new GF();
+            game.start();
+        };
+
+    </script>
+
+    <audio id="bruitCollision">
+         <source src="bip.mp3" type="audio/mpeg">
+         Your browser does not support the audio element.
+    </audio>
+
+</body>
+
+</html>
